@@ -46,3 +46,29 @@ export async function resolveDispute(id: string, resolution: 'RELEASE_TO_VENDOR'
   }
   return res.json();
 }
+
+export interface EscrowInput {
+  itemName: string;
+  priceUSDC: string;
+  description: string;
+  shippingWindow: string;
+}
+
+export interface EscrowResponse {
+  url: string;
+}
+
+export async function createEscrow(data: EscrowInput): Promise<EscrowResponse> {
+  const res = await fetch(`${API_URL}/escrow`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to create escrow: ${err}`);
+  }
+  return res.json();
+}

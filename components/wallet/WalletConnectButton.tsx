@@ -17,9 +17,9 @@ export default function WalletConnectButton() {
       <button
         type="button"
         onClick={() => window.open("https://freighter.app", "_blank")}
-        className="rounded-full bg-yellow-400 px-4 py-3 text-sm font-semibold text-black"
+        className="rounded-full bg-warning px-6 py-3 text-sm font-semibold text-white shadow-lg hover:opacity-90 transition-all flex items-center justify-center space-x-2"
       >
-        Install Freighter
+        <span>Install Freighter</span>
       </button>
     );
   }
@@ -35,11 +35,11 @@ export default function WalletConnectButton() {
     <button
       type="button"
       onClick={status === "connected" ? disconnect : connect}
-      className="rounded-full bg-black px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+      className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg hover:opacity-90 transition-all disabled:opacity-60 flex items-center justify-center space-x-2 min-w-[160px]"
       disabled={status === "connecting"}
       aria-busy={status === "connecting"}
     >
-      {buttonText}
+      <span>{buttonText}</span>
       {status === "error" && error ? <span className="sr-only"> Error: {error}</span> : null}
     </button>
   );

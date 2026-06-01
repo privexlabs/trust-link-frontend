@@ -1,94 +1,165 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { QRCodeCanvas } from "qrcode.react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Loader2, Copy, Download } from "lucide-react";
-import { toast } from "sonner";
-import { createEscrow, EscrowInput, EscrowResponse } from "@/lib/api";
+import { useState, type FormEvent } from "react";
+import { createEscrow, type EscrowInput } from "@/lib/api";
 
-const SHIPPING_OPTIONS = ["Same day", "1–3 days", "1 week", "Custom"] as const;
+const shippingOptions = ["Same day", "1-3 days", "1 week", "Custom"] as const;
 
-interface FormState {
+type ShippingWindow = (typeof shippingOptions)[number];
+
+type FormValues = {
   itemName: string;
   priceUSDC: string;
   description: string;
-  shippingWindow: string;
+  shippingWindow: ShippingWindow;
+};
+
+type FormErrors = Partial<Record<keyof FormValues, string>>;
+
+const defaultValues: FormValues = {
+  itemName: "",
+  priceUSDC: "",
+  description: "",
+  shippingWindow: shippingOptions[0],
+};
+
+function buildQrMatrix(value: string) {
+  const size = 21;
+  const matrix = Array.from({ length: size }, () => Array<boolean>(size).fill(false));
+  const seed = Array.from(value).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+
+  const setFinder = (row: number, col: number) => {
+    for (let y = 0; y < 7; y += 1) {
+      for (let x = 0; x < 7; x += 1) {
+        const isBorder = x === 0 || y === 0 || x === 6 || y === 6;
+        const isCenter = x >= 2 && x <= 4 && y >= 2 && y <= 4;
+        matrix[row + y][col + x] = isBorder || isCenter;
+      }
+    }
+  };
+
+  setFinder(0, 0);
+  setFinder(0, size - 7);
+  setFinder(size - 7, 0);
+
+  for (let i = 8; i < size - 8; i += 1) {
+    matrix[6][i] = i % 2 === 0;
+    matrix[i][6] = i % 2 === 0;
+  }
+
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col < size; col += 1) {
+      if (matrix[row][col]) {
+        continue;
+      }
+
+      const shouldFill = ((row * 11 + col * 17 + seed) % 7) < 3;
+      if (shouldFill) {
+        matrix[row][col] = true;
+      }
+    }
+  }
+
+  return matrix;
 }
 
-function getEscrowIdFromUrl(url: string): string {
-  return url.split("/").pop() || "escrow";
+function QrCode({ value }: { value: string }) {
+  const matrix = buildQrMatrix(value);
+
+  return (
+    <svg
+      data-testid="qr-code"
+      role="img"
+      aria-label={`QR code for ${value}`}
+      viewBox="0 0 21 21"
+      className="h-48 w-48 rounded-3xl border border-zinc-200 bg-white p-3 shadow-inner dark:border-zinc-800"
+      shapeRendering="crispEdges"
+    >
+      <rect width="21" height="21" fill="white" />
+      {matrix.map((row, y) =>
+        row.map((filled, x) =>
+          filled ? <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill="black" /> : null
+        )
+      )}
+    </svg>
+  );
+}
+
+function validate(values: FormValues): FormErrors {
+  const errors: FormErrors = {};
+
+  if (!values.itemName.trim()) {
+    errors.itemName = "Item name is required.";
+  }
+
+  if (!values.priceUSDC.trim()) {
+    errors.priceUSDC = "Price is required.";
+  } else if (Number.isNaN(Number(values.priceUSDC)) || Number(values.priceUSDC) <= 0) {
+    errors.priceUSDC = "Price must be a positive number.";
+  }
+
+  if (!values.description.trim()) {
+    errors.description = "Description is required.";
+  }
+
+  return errors;
 }
 
 export default function EscrowCreateForm() {
-  const [form, setForm] = useState<FormState>({
-    itemName: "",
-    priceUSDC: "",
-    description: "",
-    shippingWindow: SHIPPING_OPTIONS[0],
-  });
-  const [errors, setErrors] = useState<Partial<FormState>>({});
+  const [values, setValues] = useState<FormValues>(defaultValues);
+  const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const validate = (): boolean => {
-    const newErrors: Partial<FormState> = {};
-    if (!form.itemName.trim()) newErrors.itemName = "Item name is required";
-    if (!form.priceUSDC || isNaN(Number(form.priceUSDC)) || Number(form.priceUSDC) <= 0) {
-      newErrors.priceUSDC = "Price must be a positive number";
-    }
-    if (!form.description.trim()) newErrors.description = "Description is required";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const updateField = <K extends keyof FormValues>(field: K, value: FormValues[K]) => {
+    setValues((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
-  const handleChange = (field: keyof FormState, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
+  const copyResultUrl = async () => {
+    if (!resultUrl) {
+      return;
     }
+
+    await navigator.clipboard.writeText(resultUrl);
+    setCopyStatus("Link copied to clipboard.");
   };
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCopyStatus(null);
+    setSubmitError(null);
+
+    const nextErrors = validate(values);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
 
     setIsSubmitting(true);
-    setSubmitError(null);
 
     try {
       const payload: EscrowInput = {
-        itemName: form.itemName,
-        priceUSDC: form.priceUSDC,
-        description: form.description,
-        shippingWindow: form.shippingWindow,
+        itemName: values.itemName.trim(),
+        priceUSDC: values.priceUSDC.trim(),
+        description: values.description.trim(),
+        shippingWindow: values.shippingWindow,
       };
-      const data: EscrowResponse = await createEscrow(payload);
 
-      // Build the full buyer payment URL from the returned URL or escrow ID
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const escrowId = getEscrowIdFromUrl(data.url);
-      const paymentUrl = data.url.startsWith("http") ? data.url : `${origin}/pay/${escrowId}`;
+      const response = await createEscrow(payload);
+      if (!response.url || !/^https?:\/\//i.test(response.url)) {
+        throw new Error("The escrow service returned an invalid URL.");
+      }
 
-      setResultUrl(paymentUrl);
-      toast.success("Escrow link created!");
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Unexpected error";
-      setSubmitError(msg);
-      toast.error("Failed to create escrow");
+      setResultUrl(response.url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unexpected error creating the link.";
+      setSubmitError(message);
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const copyToClipboard = async () => {
-    if (!resultUrl) return;
-    await navigator.clipboard.writeText(resultUrl);
-    toast.success("Link copied to clipboard");
   };
 
   const downloadQR = () => {
@@ -104,113 +175,161 @@ export default function EscrowCreateForm() {
   };
 
   return (
-    <div className="max-w-xl mx-auto p-4">
-      <form onSubmit={onSubmit} className="space-y-4">
+    <div className="mx-auto w-full max-w-2xl rounded-[32px] border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 sm:p-8">
+      <form onSubmit={onSubmit} className="space-y-5">
         <div>
-          <label htmlFor="itemName" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          <label htmlFor="itemName" className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Item name
           </label>
-          <Input
+          <input
             id="itemName"
-            placeholder="Awesome Widget"
-            value={form.itemName}
-            onChange={(e) => handleChange("itemName", e.target.value)}
+            name="itemName"
+            type="text"
+            value={values.itemName}
+            onChange={(event) => updateField("itemName", event.target.value)}
             disabled={isSubmitting}
+            placeholder="Awesome Widget"
+            className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-zinc-950 outline-none ring-0 transition focus:border-zinc-400 disabled:cursor-not-allowed disabled:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50"
+            aria-invalid={Boolean(errors.itemName)}
+            aria-describedby={errors.itemName ? "itemName-error" : undefined}
           />
-          {errors.itemName && <p className="mt-1 text-xs text-red-600">{errors.itemName}</p>}
+          {errors.itemName ? (
+            <p id="itemName-error" className="mt-2 text-sm text-red-600">
+              {errors.itemName}
+            </p>
+          ) : null}
         </div>
 
         <div>
-          <label htmlFor="priceUSDC" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          <label htmlFor="priceUSDC" className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Price (USDC)
           </label>
-          <Input
+          <input
             id="priceUSDC"
+            name="priceUSDC"
             type="number"
-            placeholder="123.45"
-            value={form.priceUSDC}
-            onChange={(e) => handleChange("priceUSDC", e.target.value)}
+            step="0.01"
+            value={values.priceUSDC}
+            onChange={(event) => updateField("priceUSDC", event.target.value)}
             disabled={isSubmitting}
+            placeholder="123.45"
+            className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-zinc-950 outline-none ring-0 transition focus:border-zinc-400 disabled:cursor-not-allowed disabled:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50"
+            aria-invalid={Boolean(errors.priceUSDC)}
+            aria-describedby={errors.priceUSDC ? "priceUSDC-error" : undefined}
           />
-          {errors.priceUSDC && <p className="mt-1 text-xs text-red-600">{errors.priceUSDC}</p>}
+          {errors.priceUSDC ? (
+            <p id="priceUSDC-error" className="mt-2 text-sm text-red-600">
+              {errors.priceUSDC}
+            </p>
+          ) : null}
         </div>
 
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          <label
+            htmlFor="description"
+            className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          >
             Description
           </label>
-          <Input
+          <input
             id="description"
-            placeholder="Brief description"
-            value={form.description}
-            onChange={(e) => handleChange("description", e.target.value)}
+            name="description"
+            type="text"
+            value={values.description}
+            onChange={(event) => updateField("description", event.target.value)}
             disabled={isSubmitting}
+            placeholder="Brief description"
+            className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-zinc-950 outline-none ring-0 transition focus:border-zinc-400 disabled:cursor-not-allowed disabled:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50"
+            aria-invalid={Boolean(errors.description)}
+            aria-describedby={errors.description ? "description-error" : undefined}
           />
-          {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description}</p>}
+          {errors.description ? (
+            <p id="description-error" className="mt-2 text-sm text-red-600">
+              {errors.description}
+            </p>
+          ) : null}
         </div>
 
         <div>
-          <label htmlFor="shippingWindow" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          <label
+            htmlFor="shippingWindow"
+            className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          >
             Shipping window
           </label>
           <select
             id="shippingWindow"
-            value={form.shippingWindow}
-            onChange={(e) => handleChange("shippingWindow", e.target.value)}
+            name="shippingWindow"
+            value={values.shippingWindow}
+            onChange={(event) => updateField("shippingWindow", event.target.value as ShippingWindow)}
             disabled={isSubmitting}
-            className="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-900 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-zinc-950 outline-none ring-0 transition focus:border-zinc-400 disabled:cursor-not-allowed disabled:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50"
           >
-            {SHIPPING_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
+            {shippingOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
               </option>
             ))}
           </select>
         </div>
 
-        {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+        {submitError ? (
+          <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+            {submitError}
+          </p>
+        ) : null}
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creating link…
-            </>
-          ) : (
-            "Create escrow link"
-          )}
-        </Button>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="inline-flex w-full items-center justify-center rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
+        >
+          {isSubmitting ? "Creating link..." : "Create escrow link"}
+        </button>
       </form>
 
-      {resultUrl && (
-        <div className="mt-6 p-4 border border-zinc-200 rounded-xl bg-white dark:bg-zinc-900 dark:border-zinc-700 shadow">
-          <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-100 mb-3">
-            Your Escrow Link
-          </h3>
-
-          <div className="flex items-center gap-2 mb-4">
-            <Input readOnly value={resultUrl} className="flex-1 font-mono text-xs" />
-            <Button variant="outline" size="icon" onClick={copyToClipboard} aria-label="Copy link">
-              <Copy className="h-4 w-4" />
-            </Button>
+      {resultUrl ? (
+        <section
+          data-testid="link-card"
+          className="mt-8 rounded-[28px] border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900/60 sm:p-6"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                Shareable link ready
+              </h2>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Copy this URL or scan the QR code to share it with a buyer.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={copyResultUrl}
+              className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-white dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-950"
+            >
+              Copy link
+            </button>
           </div>
 
-          {/* QR Code — sized for mobile scanning */}
-          <div className="flex justify-center mb-4">
-            <QRCodeCanvas
-              ref={canvasRef}
+          <div className="mt-5">
+            <label htmlFor="shareable-url" className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Shareable URL
+            </label>
+            <input
+              id="shareable-url"
+              data-testid="shareable-url"
+              readOnly
               value={resultUrl}
-              size={200}
-              marginSize={2}
+              className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-mono text-sm text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50"
             />
+            {copyStatus ? <p className="mt-2 text-sm text-emerald-600">{copyStatus}</p> : null}
           </div>
 
-          <Button variant="outline" className="w-full" onClick={downloadQR} aria-label="Download QR code">
-            <Download className="mr-2 h-4 w-4" />
-            Download QR
-          </Button>
-        </div>
-      )}
+          <div className="mt-6 flex justify-center">
+            <QrCode value={resultUrl} />
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

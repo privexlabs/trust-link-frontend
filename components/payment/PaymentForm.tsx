@@ -4,6 +4,7 @@ import { useState } from "react";
 import useWallet from "@/hooks/useWallet";
 import { submitPayment } from "@/lib/stellar/contract";
 import { Loader2, ShieldCheck, CheckCircle2, AlertCircle } from "lucide-react";
+import { formatUSDC } from "@/utils/currency";
 
 interface PaymentFormProps {
   amount?: string;
@@ -57,7 +58,7 @@ export default function PaymentForm({
         <div className="p-4 bg-muted-bg rounded-2xl space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted">Amount</span>
-            <span className="font-bold text-foreground">{amount} XLM</span>
+            <span className="font-bold text-foreground">{formatUSDC(amount)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted">Recipient</span>
@@ -229,19 +230,19 @@ export default function PaymentForm({
         <div className="flex justify-between border-b border-zinc-100 pb-4 dark:border-zinc-800">
           <span className="text-zinc-500 dark:text-zinc-400">Item Amount</span>
           <span className="font-medium text-zinc-900 dark:text-zinc-100">
-            XLM {amount}
+            {formatUSDC(amount)}
           </span>
         </div>
         <div className="flex justify-between border-b border-zinc-100 pb-4 dark:border-zinc-800">
           <span className="text-zinc-500 dark:text-zinc-400">Protocol Fee</span>
           <span className="font-medium text-zinc-900 dark:text-zinc-100">
-            XLM {protocolFee}
+            {formatUSDC(protocolFee)}
           </span>
         </div>
         <div className="flex justify-between pt-2">
           <span className="font-semibold text-zinc-900 dark:text-zinc-100">Total</span>
           <span className="font-bold text-zinc-900 dark:text-zinc-100">
-            XLM {total}
+            {formatUSDC(total)}
           </span>
         </div>
       </div>

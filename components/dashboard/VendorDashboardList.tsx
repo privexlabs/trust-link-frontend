@@ -11,6 +11,7 @@ import { getVendorEscrows } from "@/lib/api";
 import { downloadCsv } from "@/utils/exportCsv";
 import type { Escrow } from "@/types";
 import EmptyVendorState from "./EmptyVendorState";
+import { formatUSDC } from "@/utils/currency";
 export default function VendorDashboardList({ loading = false }: { loading?: boolean }) {
   const [escrows, setEscrows] = useState<Escrow[] | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -186,7 +187,7 @@ export default function VendorDashboardList({ loading = false }: { loading?: boo
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
                     <span>Buyer: {escrow.buyerId ? `${escrow.buyerId.slice(0, 4)}...${escrow.buyerId.slice(-4)}` : 'Unknown'}</span>
                     <span>•</span>
-                    <span>Amount: {escrow.amount} USDC</span>
+                    <span>Amount: {formatUSDC(escrow.amount)}</span>
                     <span>•</span>
                     <span>Created: {new Date(escrow.createdAt).toLocaleDateString()}</span>
                   </div>

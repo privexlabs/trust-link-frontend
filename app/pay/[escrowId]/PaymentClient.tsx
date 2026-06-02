@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Escrow } from "@/types";
 import { useWallet } from "@/components/providers/WalletProvider";
 import { useTranslation } from "react-i18next";
+import { formatUSDC } from "@/utils/currency";
 import { track } from "@/lib/analytics";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -39,10 +40,7 @@ export default function PaymentClient({ escrow }: { escrow: Escrow }) {
     }
   };
 
-  const formattedAmount = new Intl.NumberFormat(i18n.language, {
-    style: "currency",
-    currency: "USD",
-  }).format(escrow.amount);
+  const formattedAmount = formatUSDC(escrow.amount);
 
   if (txHash) {
     return (

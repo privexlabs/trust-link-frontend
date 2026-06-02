@@ -6,6 +6,7 @@ import { TrustBadge } from "@/components/payment/TrustBadge";
 import { useWallet } from "@/components/providers/WalletProvider";
 import { connectFreighter, isFreighterInstalled } from "@/lib/stellar/freighter";
 import { patchBuyerContact } from "@/lib/api";
+import { formatUSDC } from "@/utils/currency";
 
 interface PaymentEscrowClientProps {
   escrow: Escrow;
@@ -14,9 +15,7 @@ interface PaymentEscrowClientProps {
 
 const PLATFORM_FEE_PERCENT = 1.5;
 
-function formatUsd(value: number): string {
-  return `$${value.toFixed(2)}`;
-}
+
 
 interface ContactErrors {
   base?: string;
@@ -116,15 +115,15 @@ export function PaymentEscrowClient({ escrow, escrowId }: PaymentEscrowClientPro
           </div>
           <div className="flex items-center justify-between gap-3">
             <dt className="text-zinc-600 dark:text-zinc-400">Amount</dt>
-            <dd className="font-medium text-zinc-900 dark:text-zinc-100">{formatUsd(amount)}</dd>
+            <dd className="font-medium text-zinc-900 dark:text-zinc-100">{formatUSDC(amount)}</dd>
           </div>
           <div className="flex items-center justify-between gap-3">
             <dt className="text-zinc-600 dark:text-zinc-400">Platform Fee ({PLATFORM_FEE_PERCENT}%)</dt>
-            <dd className="font-medium text-zinc-900 dark:text-zinc-100">{formatUsd(fee)}</dd>
+            <dd className="font-medium text-zinc-900 dark:text-zinc-100">{formatUSDC(fee)}</dd>
           </div>
           <div className="flex items-center justify-between gap-3 border-t border-zinc-200 pt-2 dark:border-zinc-800">
             <dt className="font-semibold text-zinc-900 dark:text-zinc-100">Total</dt>
-            <dd className="font-semibold text-zinc-900 dark:text-zinc-100">{formatUsd(total)}</dd>
+            <dd className="font-semibold text-zinc-900 dark:text-zinc-100">{formatUSDC(total)}</dd>
           </div>
         </dl>
       </div>

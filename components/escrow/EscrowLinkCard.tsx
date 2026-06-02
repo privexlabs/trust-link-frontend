@@ -8,13 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Copy, Share2, Download, X } from "lucide-react";
 import { toast } from "sonner";
+import { formatUSDC } from "@/utils/currency";
 
 async function fetchEscrowLink() {
   await new Promise((resolve) => setTimeout(resolve, 150));
   return {
     title: "Escrow Agreement 1293",
     status: "Active",
-    amount: "$12,450",
+    amount: 12450,
     expires: "May 31, 2026",
     escrowId: "1293",
     url: "https://trustlink.example.com/pay/1293",
@@ -26,7 +27,7 @@ export default function EscrowLinkCard({ loading = false }: { loading?: boolean 
   const [link, setLink] = useState<{
     title: string;
     status: string;
-    amount: string;
+    amount: number;
     expires: string;
     escrowId: string;
     url: string;
@@ -114,7 +115,7 @@ export default function EscrowLinkCard({ loading = false }: { loading?: boolean 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Amount</p>
-          <p className="mt-1 text-base font-medium text-zinc-900 dark:text-zinc-100">{link.amount}</p>
+          <p className="mt-1 text-base font-medium text-zinc-900 dark:text-zinc-100">{formatUSDC(link.amount)}</p>
         </div>
         <div>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Expires</p>

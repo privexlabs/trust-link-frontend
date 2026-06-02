@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { NetworkProvider } from "@/components/providers/NetworkProvider";
 import { WalletProvider } from "@/components/providers/WalletProvider";
 import { SubscriptionProvider } from "@/components/providers/SubscriptionProvider";
 import { NotificationProvider } from "@/components/providers/NotificationProvider";
@@ -10,6 +9,7 @@ import BottomNav from "@/components/layout/BottomNav";
 import Footer from "@/components/layout/Footer";
 import Navbar from "@/components/layout/Navbar";
 import TestnetBanner from "@/components/layout/TestnetBanner";
+import CommandPalette from "@/components/ui/CommandPalette";
 import { ServiceWorkerProvider } from "@/components/providers/ServiceWorkerProvider";
 import { Toaster } from "sonner";
 import CommandPalette from "@/components/ui/CommandPalette";

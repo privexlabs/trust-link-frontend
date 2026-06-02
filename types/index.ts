@@ -50,3 +50,22 @@ export interface Tracking {
   estimatedDelivery?: string;
   events: TrackingEvent[];
 }
+
+export interface AppNotification {
+  id: string;
+  escrowId: string;
+  escrowItem: string;
+  type: EscrowStatus;
+  message: string;
+  timestamp: string;
+  read: boolean;
+}
+
+export type Plan = "FREE" | "PRO";
+
+export interface Subscription {
+  plan: Plan;
+  vendorId: string;
+  upgradedAt?: string;
+  expiresAt?: string;
+}
